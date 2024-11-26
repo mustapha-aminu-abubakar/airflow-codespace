@@ -2,6 +2,9 @@ from airflow.models.dag import DAG
 from airflow.decorators import dag, task
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
+import yfinance as yf                       #for pulling financial information - income statement
+from bs4 import BeautifulSoup as bs         #for parsing http response 
+import requests                             #for making http requests to target server
 import csv
 import os
 
@@ -11,18 +14,15 @@ default_args = {
 }
 
 @dag(
-    dag_id = 'extract_stock_prices',
+    dag_id = 'stock_prices_etl',
     default_args=default_args,
     schedule= '0 0 * * Mon-Fri',
     start_date=datetime(2024, 11, 26),
 )
-def stock_price_etl():
+def stock_prices_etl():
     
     @task(multiple_outputs=True)
-    def generate_tickers(index = 'dowjones'):
-        import requests                             #for making http requests to target server
-        from bs4 import BeautifulSoup as bs         #for parsing http response 
-        
+    def generate_tickers(index = 'dowjones'):        
         
         url = f"https://www.slickcharts.com/{index}"
         headers = {
@@ -46,7 +46,6 @@ def stock_price_etl():
     @task
     def get_stock_prices(index, ticker_list):
     
-        import yfinance as yf                       #for pulling financial information - income statement
         index_list = {'sp500': 'SP500', 'nasdaq100': 'NDX100', 'dowjones': 'DJI30'}
         data_parsed = {}
         for ticker in ticker_list:
@@ -111,6 +110,6 @@ def stock_price_etl():
     [sp500_prices, ndx100_prices, dji30_prices] >> load_data()
    
     
-dag = stock_price_etl()
+stock_prices_etl = stock_prices_etl()
     
     
