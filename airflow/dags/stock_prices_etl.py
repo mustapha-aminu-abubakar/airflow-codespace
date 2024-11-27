@@ -1,6 +1,7 @@
 from airflow.models.dag import DAG
 from airflow.decorators import dag, task
 from airflow.operators.python import PythonOperator
+from airflow.utils.trigger_rule import TriggerRule
 from datetime import datetime, timedelta
 import yfinance as yf                       #for pulling financial information - income statement
 from bs4 import BeautifulSoup as bs         #for parsing http response 
@@ -47,14 +48,14 @@ def stock_prices_etl():
     def get_stock_prices(index, ticker_list):
     
         index_list = {'sp500': 'SP500', 'nasdaq100': 'NDX100', 'dowjones': 'DJI30'}
-        data_parsed = {}
+        # data_parsed = {}
         for ticker in ticker_list:
             try:
                 yf_ticker = yf.Tickers(ticker)
                 data = yf_ticker.history(period="1d", group_by= 'tickers')
                 data = data.reset_index()
                 data_dict = data.to_dict(orient='records')
-                data_parsed[ticker] = {
+                data_parsed = {
                     'Date' : data_dict[0][('Date', '')].strftime('%Y-%m-%d'),
                     'Ticker' : ticker,
                     'Stock Index': index_list[index],
@@ -70,8 +71,11 @@ def stock_prices_etl():
                 print(e)
         return data_parsed 
     
-    @task
-    def load_data(data):
+    @task(trigger_rule=TriggerRule.ONE_SUCCESS)
+    def load_data(*stock_prices):
+        data = {}
+        for stock_price in stock_prices:
+            if stock_price: data.update(stock_price)
         csv_file = 'stock_prices'
         headers = [
             'Date',
@@ -90,7 +94,7 @@ def stock_prices_etl():
             writer = csv.DictWriter(file, fieldnames=headers)
             if not file_exists:
                 writer.writeheader()
-            writer.writerows(data.values())  # Appends multiple rows
+            writer.writerows(data)  # Appends multiple rows
 
     
     #dependencies
@@ -98,16 +102,16 @@ def stock_prices_etl():
     ndx100_tickers = generate_tickers('nasdaq100')    
     dji30_tickers = generate_tickers('dowjones')
     
-    sp500_prices = get_stock_prices(*sp500_tickers.values())
-    ndx100_prices = get_stock_prices(*ndx100_tickers.values())
-    dji30_prices = get_stock_prices(*dji30_tickers.values())
+    sp500_prices = get_stock_prices(sp500_tickers['index'], sp500_tickers['tickers'])
+    ndx100_prices = get_stock_prices(ndx100_tickers['index'], ndx100_tickers['tickers'])
+    dji30_prices = get_stock_prices(dji30_tickers['index'], dji30_tickers['tickers'])
     
     
     sp500_tickers >> sp500_prices
     ndx100_tickers >> ndx100_prices
     dji30_tickers >> dji30_prices
     
-    [sp500_prices, ndx100_prices, dji30_prices] >> load_data()
+    [sp500_prices, ndx100_prices, dji30_prices] >> load_data(sp500_prices, ndx100_prices, dji30_prices)
    
     
 stock_prices_etl = stock_prices_etl()
