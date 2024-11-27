@@ -18,7 +18,7 @@ default_args = {
     dag_id = 'stock_prices_etl',
     default_args=default_args,
     schedule= '0 0 * * Mon-Fri',
-    start_date=datetime(2024, 11, 26),
+    start_date=datetime(2024, 11, 27),
 )
 def stock_prices_etl():
     
@@ -48,7 +48,7 @@ def stock_prices_etl():
     def get_stock_prices(index, ticker_list):
     
         index_list = {'sp500': 'SP500', 'nasdaq100': 'NDX100', 'dowjones': 'DJI30'}
-        # data_parsed = {}
+        stock_price_data = []
         for ticker in ticker_list:
             try:
                 yf_ticker = yf.Tickers(ticker)
@@ -68,14 +68,14 @@ def stock_prices_etl():
                     'Stock Splits' : data_dict[0][(ticker, 'Stock Splits')]        
                 }
             except Exception as e:
-                print(e)
-        return data_parsed 
+                pass
+            stock_price_data.append(data_parsed)
+        return stock_price_data 
     
     @task(trigger_rule=TriggerRule.ONE_SUCCESS)
     def load_data(*stock_prices):
-        data = {}
-        for stock_price in stock_prices:
-            if stock_price: data.update(stock_price)
+        data = []
+        for index_list in stock_prices: data.extend(index_list)
         csv_file = 'stock_prices'
         headers = [
             'Date',
