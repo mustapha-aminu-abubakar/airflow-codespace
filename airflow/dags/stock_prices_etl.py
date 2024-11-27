@@ -3,7 +3,7 @@ from airflow.decorators import dag, task
 from airflow.operators.python import PythonOperator
 from airflow.utils.trigger_rule import TriggerRule
 from datetime import datetime, timedelta
-import yfinance as yf                       #for pulling financial information - income statement
+import yfinance as yf                       #for pulling financial information
 from bs4 import BeautifulSoup as bs         #for parsing http response 
 import requests                             #for making http requests to target server
 import csv
